@@ -2,7 +2,7 @@ import asyncio
 import hmac
 import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Annotated
 from uuid import UUID
 
@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db import engine, get_session
+from app.outbox import run_outbox_publisher
 from app.schemas import PaymentAccepted, PaymentCreate, PaymentDetails
 from app.services import create_payment, IdempotencyConflictError, get_payment
 
@@ -38,10 +39,18 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+    publisher_task = asyncio.create_task(run_outbox_publisher())
+
     try:
         yield
     finally:
-        await engine.dispose()
+        publisher_task.cancel()
+
+        try:
+            with suppress(asyncio.CancelledError):
+                await publisher_task
+        finally:
+            await engine.dispose()
 
 
 

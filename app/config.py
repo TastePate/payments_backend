@@ -29,4 +29,9 @@ class Settings(BaseSettings):
             database=self.postgres_db
         )
 
+    rabbitmq_host: str = "127.0.0.1"
+    rabbitmq_port: int = Field(default=5672, ge=1, le=65535)
+    rabbitmq_user: str = Field(min_length=1)
+    rabbitmq_password: SecretStr = Field(min_length=1)
+    
 settings = Settings()

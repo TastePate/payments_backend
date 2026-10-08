@@ -33,3 +33,8 @@ class PaymentDetails(BaseModel):
     webhook_url: HttpUrl
     created_at: datetime
     processed_at: datetime | None
+
+class PaymentMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    payment_id: UUID
