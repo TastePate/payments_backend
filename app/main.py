@@ -4,8 +4,9 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import Security, HTTPException, FastAPI, Depends
+from fastapi import Security, HTTPException, FastAPI, Depends, Header
 from fastapi.security import APIKeyHeader
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -13,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db import engine, get_session
+from app.schemas import PaymentAccepted, PaymentCreate, PaymentDetails
+from app.services import create_payment, IdempotencyConflictError, get_payment
 
 api_key_header = APIKeyHeader(
     name="X-API-Key",
@@ -69,3 +72,40 @@ async def health(session: Annotated[AsyncSession, Depends(get_session)]) -> dict
         "database": "ok"
     }
 
+@app.post("/api/v1/payments", status_code=202, response_model=PaymentAccepted)
+async def post_payment(
+        data: PaymentCreate,
+        idempotency_key: Annotated[
+            str,
+            Header(alias="Idempotency-Key", min_length=1, max_length=255)
+        ],
+        session: Annotated[AsyncSession, Depends(get_session)]
+) -> PaymentAccepted:
+    try:
+        payment = await create_payment(session, data, idempotency_key)
+    except IdempotencyConflictError as e:
+        raise HTTPException(
+            status_code=409,
+            detail=str(e)
+        ) from e
+
+    return PaymentAccepted(
+        payment_id=payment.id,
+        status=payment.status,
+        created_at=payment.created_at
+    )
+
+@app.get("/api/v1/payments/{payment_id}", response_model=PaymentDetails)
+async def get_payment_details(
+        payment_id: UUID,
+        session: Annotated[AsyncSession, Depends(get_session)]
+) -> PaymentDetails:
+    payment = await get_payment(session, payment_id)
+
+    if payment is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Payments not found"
+        )
+
+    return PaymentDetails.model_validate(payment)

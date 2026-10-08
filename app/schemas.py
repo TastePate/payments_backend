@@ -20,3 +20,16 @@ class PaymentAccepted(BaseModel):
     status: Literal["pending", "succeeded", "failed"]
     created_at: datetime
 
+class PaymentDetails(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    payment_id: UUID = Field(validation_alias="id")
+    amount: Decimal
+    currency: Literal["RUB", "USD", "EUR"]
+    description: str | None
+    metadata: dict[str, Any] = Field(validation_alias="payment_metadata")
+    status: Literal["pending", "succeeded", "failed"]
+    idempotency_key: str
+    webhook_url: HttpUrl
+    created_at: datetime
+    processed_at: datetime | None

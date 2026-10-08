@@ -1,4 +1,5 @@
 import json
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -85,3 +86,10 @@ async def create_payment(
                 raise IdempotencyConflictError("Idempotency-Key already used with different data")
 
             return payment
+
+
+async def get_payment(
+        session: AsyncSession,
+        payment_id: UUID
+) -> Payment | None:
+    return await session.get(Payment, payment_id)
