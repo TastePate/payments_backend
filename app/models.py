@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import uuid4, UUID
 
-from sqlalchemy import Numeric, String, CheckConstraint, Text, DateTime, func
+from sqlalchemy import Numeric, String, CheckConstraint, Text, DateTime, func, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base
@@ -77,4 +77,35 @@ class Payment(Base):
             "status IN ('pending', 'succeeded', 'failed')",
             name="ck_payments_status"
         ),
+    )
+
+class OutboxEvent(Base):
+    __tablename__ = "outbox_events"
+
+    id: Mapped[UUID] = mapped_column(
+        primary_key=True,
+        default=uuid4
+    )
+
+    payment_id: Mapped[UUID] = mapped_column(
+        ForeignKey("payments.id"),
+        nullable=False,
+        unique=True,
+    )
+
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now()
+    )
+
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
     )
