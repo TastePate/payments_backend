@@ -40,6 +40,66 @@ services:
       retries: 10
       start_period: 20s
 
+  migrate:
+    build: .
+    image: payment-backend:local
+
+    env_file:
+      - .env
+
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    image: payment-backend:local
+
+    env_file:
+      - .env
+
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+
+  consumer:
+    build: .
+    image: payment-backend:local
+
+    env_file:
+      - .env
+
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+
+    command: [ "python", "-m", "faststream", "run", "app.consumer:app" ]
+
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   rabbitmq_data:
