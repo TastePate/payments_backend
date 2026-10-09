@@ -1,10 +1,12 @@
 import json
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.gateway import simulate_payment
 from app.models import Payment, OutboxEvent
 from app.schemas import PaymentCreate
 
@@ -93,3 +95,27 @@ async def get_payment(
         payment_id: UUID
 ) -> Payment | None:
     return await session.get(Payment, payment_id)
+
+
+async def process_payment(
+        session: AsyncSession,
+        payment_id: UUID
+) -> Payment | None:
+    async with session.begin():
+        query = (
+            select(Payment)
+            .where(Payment.id == payment_id)
+            .with_for_update()
+        )
+        payment = await session.scalar(query)
+
+        if payment is None:
+            return None
+
+        if payment.status != "pending":
+            return payment
+
+        payment.status = await simulate_payment()
+        payment.processed_at = datetime.now(UTC)
+
+    return payment

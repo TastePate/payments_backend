@@ -13,10 +13,16 @@ broker = RabbitBroker(
     default_channel=Channel(
         publisher_confirms=True,
         on_return_raises=True,
+        prefetch_count=1
     )
 )
 
 payments_queue = RabbitQueue(
     "payments.new",
+    durable=True
+)
+
+dead_letter_queue = RabbitQueue(
+    "payments.dlq",
     durable=True
 )
